@@ -2,19 +2,14 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<title>Flores 🌹🌼</title>
+<title>Flores Pro 🌹🌼</title>
 <style>
-    body {
-        margin: 0;
-        background: black;
-        overflow: hidden;
-    }
-    canvas {
-        display: block;
-    }
+body { margin:0; background:black; }
+canvas { display:block; }
 </style>
 </head>
 <body>
+
 <canvas id="c"></canvas>
 
 <script>
@@ -24,90 +19,101 @@ const ctx = canvas.getContext("2d");
 canvas.width = window.innerWidth;
 canvas.height = window.innerHeight;
 
+let rosas, girasoles;
+
+async function loadData() {
+    rosas = await fetch("rosas.json").then(r => r.json());
+    girasoles = await fetch("sunflowers.json").then(r => r.json());
+}
+
+function prepare(regions) {
+    let pts = regions.flatMap(r => r.contour);
+
+    let minX = Math.min(...pts.map(p => p[0]));
+    let maxX = Math.max(...pts.map(p => p[0]));
+    let minY = Math.min(...pts.map(p => p[1]));
+    let maxY = Math.max(...pts.map(p => p[1]));
+
+    let scale = Math.min(200/(maxX-minX), 200/(maxY-minY));
+    let cx = (minX + maxX)/2;
+    let cy = (minY + maxY)/2;
+
+    return {scale, cx, cy};
+}
+
+function drawRegions(regions, prep, ox, oy, angle) {
+    const rad = angle;
+
+    regions.forEach(r => {
+        let color = `rgb(${r.color[0]},${r.color[1]},${r.color[2]})`;
+        ctx.fillStyle = color;
+
+        ctx.beginPath();
+
+        r.contour.forEach((p, i) => {
+            let x = (p[0]-prep.cx)*prep.scale;
+            let y = (prep.cy-p[1])*prep.scale;
+
+            let rx = x*Math.cos(rad) - y*Math.sin(rad);
+            let ry = x*Math.sin(rad) + y*Math.cos(rad);
+
+            let px = rx + ox;
+            let py = ry + oy;
+
+            if(i === 0) ctx.moveTo(px, py);
+            else ctx.lineTo(px, py);
+        });
+
+        ctx.closePath();
+        ctx.fill();
+    });
+}
+
 let angle = 0;
 let time = 0;
 
-// 🌹 Dibujar rosa
-function rose(x, y, size, color) {
-    ctx.fillStyle = color;
-    ctx.beginPath();
+let prepR, prepS;
 
-    for (let i = 0; i < 360; i += 5) {
-        let rad = i * Math.PI / 180;
-        let r = size * Math.sin(3 * rad);
-        let px = x + r * Math.cos(rad);
-        let py = y + r * Math.sin(rad);
-        ctx.lineTo(px, py);
-    }
-
-    ctx.fill();
-}
-
-// 🌼 Flor amarilla
-function sunflower(x, y, size) {
-    ctx.fillStyle = "yellow";
-
-    for (let i = 0; i < 12; i++) {
-        let ang = i * Math.PI / 6;
-        ctx.beginPath();
-        ctx.ellipse(
-            x + Math.cos(ang) * size,
-            y + Math.sin(ang) * size,
-            size / 2,
-            size,
-            ang,
-            0,
-            Math.PI * 2
-        );
-        ctx.fill();
-    }
-
-    // centro
-    ctx.fillStyle = "gold";
-    ctx.beginPath();
-    ctx.arc(x, y, size / 2, 0, Math.PI * 2);
-    ctx.fill();
-}
-
-// posiciones
-let flowers = [
-    {x:-200,y:100,type:"rose",color:"red"},
-    {x:200,y:100,type:"rose",color:"red"},
-    {x:0,y:-200,type:"rose",color:"pink"},
-    {x:-150,y:-50,type:"rose",color:"red"},
-    {x:150,y:-50,type:"rose",color:"red"},
-    {x:0,y:200,type:"sun"}
-];
-
-function draw() {
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+function loop() {
+    ctx.clearRect(0,0,canvas.width,canvas.height);
 
     ctx.save();
     ctx.translate(canvas.width/2, canvas.height/2);
-    ctx.rotate(angle);
 
-    flowers.forEach((f, i) => {
-        if (i < time) {
-            if (f.type === "rose") {
-                rose(f.x, f.y, 40, f.color);
-            } else {
-                sunflower(f.x, f.y, 30);
-            }
+    let posiciones = [
+        [-200,100],
+        [200,100],
+        [0,-200],
+        [-150,-50],
+        [150,-50]
+    ];
+
+    posiciones.forEach((pos,i)=>{
+        if(i < time){
+            drawRegions(rosas, prepR, pos[0], pos[1], angle);
         }
     });
+
+    if(time > 2){
+        drawRegions(girasoles, prepS, 0, 200, angle);
+    }
 
     ctx.restore();
 
     angle += 0.01;
-
-    if (time < flowers.length) {
+    if(time < posiciones.length + 1){
         time += 0.02;
     }
 
-    requestAnimationFrame(draw);
+    requestAnimationFrame(loop);
 }
 
-draw();
+loadData().then(()=>{
+    prepR = prepare(rosas);
+    prepS = prepare(girasoles);
+    loop();
+});
 </script>
+
 </body>
 </html>
